@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Seguro - Login</title>
+    <script defer src="/socket.io/socket.io.js"></script>
+    <script defer src="./js/main.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #1e1f22;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #313338;
+            --accent-color: #5865f2;
+            --text-primary: #f3f4f5;
+            --text-secondary: #949ba4;
+            --spacing: 16px;
+            --border-radius: 8px;
+            --error-color: #ed4245;
+            --success-color: #3ba55c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing);
+        }
+
+        .login-container {
+            background-color: var(--bg-secondary);
+            padding: calc(var(--spacing) * 2);
+            border-radius: calc(var(--border-radius) * 2);
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: calc(var(--spacing) * 2);
+        }
+
+        .login-header h2 {
+            font-size: 24px;
+            margin-bottom: var(--spacing);
+        }
+
+        .login-header .logo {
+            font-size: 48px;
+            color: var(--accent-color);
+            margin-bottom: var(--spacing);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing);
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            padding-left: 36px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid rgba(0, 0, 0, 0.3);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #4752c4;
+        }
+
+        button.secondary {
+            background-color: transparent;
+            margin-top: var(--spacing);
+        }
+
+        button.secondary:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .divider {
+            margin: var(--spacing) 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .register-prompt {
+            text-align: center;
+            margin-top: var(--spacing);
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .register-prompt a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .register-prompt a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h2>Bienvenido de nuevo</h2>
+            <p>¡Nos alegra verte!</p>
+        </div>
+
+        <form onsubmit="loginAndContinue(event)">
+            <div class="form-group">
+                <label for="login-user">CORREO O USUARIO</label>
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input id="login-user" type="text" required autocomplete="username" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="login-pass">CONTRASEÑA</label>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input id="login-pass" type="password" required autocomplete="current-password" />
+                </div>
+                <div id="login-error" class="error-message"></div>
+            </div>
+
+            <button type="submit">Iniciar sesión</button>
+            <div id="sending-login" class="success-message" style="display:none; background-color: var(--bg-tertiary); color: var(--accent-color); margin-top:8px;">
+                <i class="fas fa-spinner fa-spin"></i> Enviando código de verificación...
+            </div>
+        </form>
+
+        <div class="register-prompt">
+            ¿Necesitas una cuenta? <a href="login.html">Regístrate</a>
+        </div>
+    </div>
+
+    <script>
+        async function loginAndContinue(event) {
+            const sending = document.getElementById('sending-login');
+            event.preventDefault();
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.style.display = 'none';
+            
+            try {
+                sending.style.display = 'block';
+                await login();
+                sending.style.display = 'none';
+                 window.location.href = 'otp.html';
+            } catch (error) {
+                sending.style.display = 'none';
+                 errorDiv.textContent = 'Usuario o contraseña incorrectos';
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+
+</html>

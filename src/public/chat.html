@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Seguro</title>
+    <script defer src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script defer src="./js/main.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #1e1f22;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #313338;
+            --accent-color: #5865f2;
+            --text-primary: #f3f4f5;
+            --text-secondary: #949ba4;
+            --spacing: 16px;
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* Servers Sidebar */
+        .servers-sidebar {
+            width: 72px;
+            background-color: var(--bg-primary);
+            padding: var(--spacing) 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--bg-secondary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-radius 0.2s;
+        }
+
+        .server-icon:hover {
+            border-radius: 16px;
+            background-color: var(--accent-color);
+        }
+
+        .server-icon.active {
+            border-radius: 16px;
+            background-color: var(--accent-color);
+        }
+
+        /* Channels Sidebar */
+        .channels-sidebar {
+            width: 240px;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .server-header {
+            padding: var(--spacing);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+
+        .channel-list {
+            padding: var(--spacing);
+            flex-grow: 1;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .channel-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .channel-item.active {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* Main Chat Area */
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-tertiary);
+        }
+
+        .chat-header {
+            padding: var(--spacing);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: var(--spacing);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing);
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            padding: 8px;
+            border-radius: var(--border-radius);
+        }
+
+        .message-role { margin-left: 6px; background-color: rgba(0, 200, 255, 0.08); align-self: flex-end; }
+        .message:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+            flex-shrink: 0;
+        }
+
+        .message-content {
+            flex-grow: 1;
+        }
+
+        .message-header { gap: 6px; font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .message-author {
+            font-weight: 500;
+        }
+
+        .message-timestamp {
+            color: var(--text-secondary);
+            font-size: 0.8em;
+        }
+
+        .message-text {
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        /* Message Input Area */
+        .message-input-container {
+            padding: var(--spacing);
+            margin: 0 var(--spacing) var(--spacing);
+            background-color: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            display: flex;
+            gap: var(--spacing);
+            align-items: center;
+        }
+
+        .message-input {
+            flex-grow: 1;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1em;
+            outline: none;
+        }
+
+        .message-actions {
+            display: flex;
+            gap: 16px;
+            color: var(--text-secondary);
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .action-button:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* User Profile Area */
+        .user-profile {
+            padding: var(--spacing);
+            background-color: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+        }
+
+        .user-info {
+            flex-grow: 1;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .user-status {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+        }
+            #emoji-picker {
+            position: absolute;
+            display: none;
+            background-color: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius);
+            padding: 6px;
+            flex-wrap: wrap;
+            gap: 6px;
+            z-index: 1000;
+        }
+        #emoji-picker span {
+            cursor: pointer;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Servers Sidebar -->
+    <div class="servers-sidebar">
+        <div class="server-icon active" title="Servidor principal">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+        <div class="server-icon" id="logout-btn" title="Cerrar sesión">
+            <i class="fas fa-sign-out-alt"></i>
+        </div>
+    </div>
+
+    <!-- Channels Sidebar -->
+    <div class="channels-sidebar">
+        <div class="server-header">
+            Chat Seguro
+        </div>
+        <div class="channel-list">
+            <div class="channel-item active">
+                <i class="fas fa-hashtag"></i>
+                <span style="margin-left: 8px;">general</span>
+            </div>
+            <div class="channel-item">
+                <i class="fas fa-hashtag"></i>
+                <span style="margin-left: 8px;">anuncios</span>
+            </div>
+            <div class="channel-item">
+                <i class="fas fa-volume-up"></i>
+                <span style="margin-left: 8px;">voz-general</span>
+            </div>
+        </div>
+        <div class="user-profile">
+            <div class="user-avatar" id="user-avatar"></div>
+            <div class="user-info">
+                <div class="user-name" id="user-name"></div>
+                <div class="user-status" id="user-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <i class="fas fa-hashtag"></i>
+            <span>general</span>
+        </div>
+        
+        <div id="chat" class="chat-messages">
+            <!-- Messages will be inserted here by JavaScript -->
+        </div>
+
+        <div class="message-input-container">
+            <button class="action-button" id="attach-btn">
+                <i class="fas fa-plus-circle"></i>
+            </button>
+            <input type="file" id="local-file-input" style="display:none" multiple>
+            <input type="text" id="message" class="message-input" placeholder="Enviar mensaje a #general">
+            <div class="message-actions">
+                <button class="action-button" id="image-btn">
+                    <i class="fas fa-sticky-note"></i>
+                </button>
+                <input type="file" id="image-input" accept="image/*" style="display:none">
+                <button class="action-button" id="emoji-btn">
+                    <i class="far fa-smile"></i>
+                </button>
+                <button class="action-button" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+</html>
