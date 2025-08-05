@@ -1,30 +1,22 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
 const { verifyToken } = require('../middleware/auth.middleware');
 const fileController = require('../controllers/file.controller');
 
 const router = express.Router();
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../public/uploads');
-(async () => {
-  try {
-    await fs.mkdir(uploadsDir, { recursive: true });
-  } catch (error) {
-    console.error('Failed to create uploads directory:', error);
-  }
-})();
-
-// Configure multer for file uploads
+// Configuración de multer para subida de archivos
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    // El directorio de subidas será manejado por el controlador
+    cb(null, '/tmp');
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    const safeFilename = file.originalname.replace(/[^\w\d.-]/g, '_');
+    cb(null, uniqueSuffix + '-' + safeFilename);
   }
 });
 
@@ -32,6 +24,7 @@ const fileFilter = (req, file, cb) => {
   const allowedTypes = [
     'image/jpeg',
     'image/png',
+    'image/gif',
     'application/pdf',
     'text/plain'
   ];
@@ -39,7 +32,9 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type'), false);
+    const error = new Error('Tipo de archivo no permitido');
+    error.status = 400;
+    cb(error, false);
   }
 };
 
@@ -47,32 +42,55 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB límite
   }
 });
 
-// Routes
-router.post('/upload', verifyToken, upload.single('file'), fileController.uploadFile);
-router.get('/download/:fileId', verifyToken, fileController.downloadFile);
-router.get('/info/:fileId', verifyToken, fileController.getFileInfo);
-
-// Error handling middleware for file uploads
-router.use((err, req, res, next) => {
+// Middleware para manejar errores de multer
+const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    // A Multer error occurred when uploading
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File size exceeds the limit (10MB)' });
-    }
-    return res.status(400).json({ error: err.message });
+    // Un error de Multer al subir el archivo
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Error al subir el archivo',
+      error: err.message 
+    });
   } else if (err) {
-    // An unknown error occurred
-    console.error('File upload error:', err);
-    return res.status(500).json({ 
-      error: 'Failed to upload file',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    // Un error desconocido ocurrió
+    console.error('Error al subir el archivo:', err);
+    return res.status(err.status || 500).json({ 
+      success: false,
+      message: err.message || 'Error al procesar el archivo',
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
+  // Si no hay error, continuar
   next();
+};
+
+// Ruta para subir archivos
+router.post(
+  '/upload',
+  verifyToken,
+  upload.single('file'),
+  handleMulterError,
+  fileController.uploadFile
+);
+
+// Ruta para descargar archivos
+router.get('/download/:fileId', verifyToken, fileController.downloadFile);
+
+// Ruta para obtener información de archivos
+router.get('/info/:fileId', verifyToken, fileController.getFileInfo);
+
+// Manejador de errores global para las rutas de archivos
+router.use((err, req, res, next) => {
+  console.error('Error en la ruta de archivos:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Error interno del servidor',
+    error: process.env.NODE_ENV === 'development' ? err.message : {}
+  });
 });
 
 module.exports = router;
