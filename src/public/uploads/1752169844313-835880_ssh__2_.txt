@@ -1,0 +1,23 @@
+/etc/netplan/00-installer-config.yaml
+
+dhcp4: no
+      addresses: [10.3.8.115/24]
+      gateway4: 10.3.8.1
+      nameservers:
+         addresses: [8.8.8.8]
+
+netplan apply
+
+openssl genrsa -out server.key 2048 
+openssl req -new -key server.key -out server.csr 
+openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt 
+
+
+/etc/apache2/sites-available/default-ssl.conf
+
+sudo a2enmod ssl 
+sudo a2ensite default-ssl 
+sudo systemctl restart apache2 
+
+scp filename username@ip_address:/home/username
+putty -ssh root@192.168.1.100 -P 22

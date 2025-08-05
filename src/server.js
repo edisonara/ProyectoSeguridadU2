@@ -8,7 +8,9 @@ const path = require("path");
 
 const authRoutes = require("./routes/auth.routes");
 const chatRoutes = require("./routes/chat.routes");
+const fileRoutes = require("./routes/file.routes");
 const { verifyToken } = require("./middleware/auth.middleware");
+const { processMetadata, cleanupTempFiles } = require("./middleware/file.middleware");
 const Message = require("./models/Message");
 const { handleSocketAuth } = require("./middleware/socketAuth.middleware");
 
@@ -43,6 +45,21 @@ app.use(express.static(path.join(__dirname, "public")));
 // Rutas
 app.use("/auth", authRoutes);
 app.use("/chat", verifyToken, chatRoutes);
+app.use("/api/files", fileRoutes);
+
+// File upload error handling
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message });
+  } else if (err) {
+    console.error('File upload error:', err);
+    return res.status(500).json({ 
+      error: 'File upload failed',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+  next();
+});
 
 // Conexión principal
 app.get("/", (req, res) => {

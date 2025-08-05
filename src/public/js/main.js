@@ -186,9 +186,17 @@ function saveFileLocally(file) {
 
 document.addEventListener('DOMContentLoaded', () => initDB());
 
+// Constante para el límite de tamaño (5MB)
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
+
 // Subir archivos al backend y compartir URL accesible
 function handleLocalFiles(fileList) {
     [...fileList].forEach(file => {
+        if (file.size > MAX_FILE_SIZE) {
+            alert(`El archivo "${file.name}" excede el límite de 5MB permitido.`);
+            return;
+        }
+        
         saveFileLocally(file);
         const form = new FormData();
         form.append('file', file);
@@ -220,6 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Imagenes
 function handleImageUpload(file) {
+    if (file.size > MAX_FILE_SIZE) {
+        alert(`La imagen "${file.name}" excede el límite de 5MB permitido.`);
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = function(e) {
         const base64 = e.target.result;
@@ -246,21 +259,62 @@ const emojiList = ['😀','😁','😂','🤣','😅','😊','😍','😎','😭
 let emojiPicker;
 
 function createEmojiPicker() {
+    // Solo crear el emoji picker si estamos en la página de chat
+    if (!document.querySelector('.chat-container')) return;
+    
     emojiPicker = document.createElement('div');
     emojiPicker.id = 'emoji-picker';
-    emojiList.forEach(e => {
+    emojiPicker.style.display = 'none';
+    
+    emojiList.forEach(emoji => {
         const span = document.createElement('span');
-        span.textContent = e;
-        span.addEventListener('click', () => {
-            const input = document.getElementById('message');
-            input.value += e;
-            input.focus();
-            emojiPicker.style.display = 'none';
-        });
+        span.textContent = emoji;
+        span.onclick = () => {
+            const messageInput = document.getElementById('message');
+            if (messageInput) {
+                messageInput.value += emoji;
+                emojiPicker.style.display = 'none';
+            }
+        };
         emojiPicker.appendChild(span);
     });
+    
     document.body.appendChild(emojiPicker);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Solo configurar el emoji picker si estamos en la página de chat
+    if (document.querySelector('.chat-container')) {
+        createEmojiPicker();
+        
+        const emojiBtn = document.getElementById('emoji-btn');
+        if (emojiBtn) {
+            emojiBtn.onclick = (e) => {
+                e.preventDefault();
+                const picker = document.getElementById('emoji-picker');
+                if (picker) {
+                    if (picker.style.display === 'none') {
+                        picker.style.display = 'flex';
+                        // Posicionar el picker cerca del botón de emoji
+                        const rect = emojiBtn.getBoundingClientRect();
+                        picker.style.position = 'absolute';
+                        picker.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+                        picker.style.right = `${window.innerWidth - rect.right + 10}px`;
+                    } else {
+                        picker.style.display = 'none';
+                    }
+                }
+            };
+        }
+        
+        // Cerrar el emoji picker al hacer clic fuera de él
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#emoji-picker') || e.target.closest('#emoji-btn')) return;
+            const picker = document.getElementById('emoji-picker');
+            if (picker) picker.style.display = 'none';
+        });
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!emojiPicker) createEmojiPicker();

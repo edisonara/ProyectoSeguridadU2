@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Segura de Archivos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .file-upload-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .file-info {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            display: none;
+        }
+        .metadata-comparison {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .metadata-panel {
+            flex: 1;
+            padding: 1rem;
+            border-radius: 5px;
+            background-color: white;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .progress {
+            height: 25px;
+            margin: 1rem 0;
+        }
+        .spinner-border {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container file-upload-container">
+        <h2 class="text-center mb-4">Gestión Segura de Archivos</h2>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Subir Archivo</h5>
+                <p class="text-muted">Sube un archivo para limpiar sus metadatos y almacenarlo de forma segura.</p>
+                
+                <form id="uploadForm" class="mt-3">
+                    <div class="mb-3">
+                        <input class="form-control" type="file" id="fileInput" required>
+                        <div class="form-text">Tamaño máximo: 10MB. Formatos permitidos: JPG, PNG, PDF, TXT</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm" id="uploadSpinner" role="status" aria-hidden="true"></span>
+                        Subir Archivo
+                    </button>
+                </form>
+                
+                <div class="progress mt-3" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="file-info" id="fileInfo">
+            <h5>Información del Archivo</h5>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <p><strong>Nombre:</strong> <span id="fileName"></span></p>
+                    <p><strong>Tamaño:</strong> <span id="fileSize"></span></p>
+                    <p><strong>Tipo:</strong> <span id="fileType"></span></p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Hash:</strong> <small id="fileHash" class="text-muted d-block text-truncate"></small></p>
+                    <p><strong>IPFS Hash:</strong> <small id="ipfsHash" class="text-muted d-block text-truncate"></small></p>
+                    <p><strong>Transacción:</strong> <small id="txHash" class="text-muted d-block text-truncate"></small></p>
+                </div>
+            </div>
+            
+            <h6>Metadatos</h6>
+            <div class="metadata-comparison">
+                <div class="metadata-panel">
+                    <h6>Original</h6>
+                    <pre id="originalMetadata" class="bg-light p-2 rounded"></pre>
+                </div>
+                <div class="metadata-panel">
+                    <h6>Limpios</h6>
+                    <pre id="cleanedMetadata" class="bg-light p-2 rounded"></pre>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                <a href="#" id="downloadLink" class="btn btn-success me-md-2">
+                    <i class="bi bi-download"></i> Descargar Archivo Limpio
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Por favor selecciona un archivo');
+                return;
+            }
+            
+            // Validar tamaño
+            if (file.size > 10 * 1024 * 1024) {
+                alert('El archivo es demasiado grande. El tamaño máximo es 10MB');
+                return;
+            }
+            
+            // Validar tipo
+            const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Tipo de archivo no permitido');
+                return;
+            }
+            
+            // Mostrar indicador de carga
+            const uploadSpinner = document.getElementById('uploadSpinner');
+            const uploadButton = document.querySelector('#uploadForm button[type="submit"]');
+            const progressBar = document.querySelector('.progress-bar');
+            const progressContainer = document.getElementById('uploadProgress');
+            
+            uploadSpinner.style.display = 'inline-block';
+            uploadButton.disabled = true;
+            progressContainer.style.display = 'block';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Configurar la petición con seguimiento de progreso
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percentComplete + '%';
+                        progressBar.setAttribute('aria-valuenow', percentComplete);
+                    }
+                };
+                
+                xhr.onload = () => {
+                    if (xhr.status === 201) {
+                        const response = JSON.parse(xhr.responseText);
+                        updateFileInfo(response);
+                    } else {
+                        const error = JSON.parse(xhr.responseText);
+                        throw new Error(error.error || 'Error al subir el archivo');
+                    }
+                };
+                
+                xhr.onerror = () => {
+                    throw new Error('Error de red al subir el archivo');
+                };
+                
+                xhr.open('POST', '/api/files/upload', true);
+                xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`);
+                xhr.send(formData);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                uploadSpinner.style.display = 'none';
+                uploadButton.disabled = false;
+            }
+        });
+        
+        function updateFileInfo(data) {
+            document.getElementById('fileInfo').style.display = 'block';
+            document.getElementById('fileName').textContent = data.fileName;
+            document.getElementById('fileSize').textContent = formatFileSize(data.size);
+            document.getElementById('fileType').textContent = data.mimeType;
+            document.getElementById('fileHash').textContent = data.hash;
+            document.getElementById('ipfsHash').textContent = data.ipfsHash || 'No disponible';
+            document.getElementById('txHash').textContent = data.txHash || 'No disponible';
+            
+            // Mostrar metadatos
+            document.getElementById('originalMetadata').textContent = 
+                data.metadata?.original ? 
+                JSON.stringify(data.metadata.original, null, 2) : 
+                'No se encontraron metadatos originales';
+                
+            document.getElementById('cleanedMetadata').textContent = 
+                data.metadata?.cleaned ? 
+                JSON.stringify(data.metadata.cleaned, null, 2) : 
+                'No se encontraron metadatos después de la limpieza';
+            
+            // Configurar enlace de descarga
+            document.getElementById('downloadLink').href = `/api/files/download/${data.fileId}`;
+            
+            // Desplazarse a la sección de información
+            document.getElementById('fileInfo').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Verificar autenticación
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        });
+    </script>
+</body>
+</html>
