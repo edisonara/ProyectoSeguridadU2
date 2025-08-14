@@ -1,109 +1,550 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión Segura de Archivos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Seguro - Archivos</title>
+    <script defer src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script defer src="./js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .file-upload-container {
-            max-width: 800px;
-            margin: 2rem auto;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        :root {
+            --bg-primary: #1e1f22;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #313338;
+            --accent-color: #5865f2;
+            --text-primary: #f3f4f5;
+            --text-secondary: #949ba4;
+            --spacing: 16px;
+            --border-radius: 8px;
         }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* Servers Sidebar */
+        .servers-sidebar {
+            width: 72px;
+            background-color: var(--bg-primary);
+            padding: var(--spacing) 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--bg-secondary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-radius 0.2s;
+        }
+
+        .server-icon:hover {
+            border-radius: 16px;
+            background-color: var(--accent-color);
+        }
+
+        .server-icon.active {
+            border-radius: 16px;
+            background-color: var(--accent-color);
+        }
+
+        /* Channels Sidebar */
+        .channels-sidebar {
+            width: 240px;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .server-header {
+            padding: var(--spacing);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+
+        .channel-list {
+            padding: var(--spacing);
+            flex-grow: 1;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .channel-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .channel-item.active {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        /* User Profile Area */
+        .user-profile {
+            padding: var(--spacing);
+            background-color: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+        }
+
+        .user-info {
+            flex-grow: 1;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .user-status {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+        }
+
+        /* File Upload Styles */
+        .file-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-tertiary);
+            overflow-y: auto;
+        }
+
+        .file-header {
+            padding: var(--spacing);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-content {
+            flex-grow: 1;
+            padding: var(--spacing);
+            overflow-y: auto;
+        }
+
+        .file-upload-container {
+            background-color: var(--bg-secondary);
+            padding: var(--spacing);
+            border-radius: var(--border-radius);
+            margin-bottom: var(--spacing);
+        }
+
         .file-info {
-            margin-top: 2rem;
-            padding: 1rem;
-            border-radius: 5px;
-            background-color: #f8f9fa;
+            margin-top: var(--spacing);
+            padding: var(--spacing);
+            border-radius: var(--border-radius);
+            background-color: var(--bg-secondary);
             display: none;
         }
+
         .metadata-comparison {
             display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
+            gap: var(--spacing);
+            margin-top: var(--spacing);
         }
+
         .metadata-panel {
             flex: 1;
-            padding: 1rem;
-            border-radius: 5px;
-            background-color: white;
+            padding: var(--spacing);
+            border-radius: var(--border-radius);
+            background-color: var(--bg-tertiary);
             max-height: 300px;
             overflow-y: auto;
         }
+
         .progress {
-            height: 25px;
-            margin: 1rem 0;
+            height: 8px;
+            margin: var(--spacing) 0;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
         }
-        .spinner-border {
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            margin-bottom: var(--spacing);
+        }
+
+        button {
+            padding: 10px 16px;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #4752c4;
+        }
+
+        .file-list {
+            margin-top: var(--spacing);
+        }
+
+        .file-item {
+            background-color: var(--bg-secondary);
+            padding: var(--spacing);
+            border-radius: var(--border-radius);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing);
+        }
+
+        .file-icon {
+            font-size: 24px;
+            color: var(--accent-color);
+        }
+
+        .file-details {
+            flex-grow: 1;
+        }
+
+        .file-actions a {
+            color: var(--text-secondary);
+            margin-left: 8px;
+            text-decoration: none;
+        }
+
+        .file-actions a:hover {
+            color: var(--text-primary);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--text-primary);
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
             display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="container file-upload-container">
-        <h2 class="text-center mb-4">Gestión Segura de Archivos</h2>
-        
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Subir Archivo</h5>
-                <p class="text-muted">Sube un archivo para limpiar sus metadatos y almacenarlo de forma segura.</p>
-                
-                <form id="uploadForm" class="mt-3">
-                    <div class="mb-3">
-                        <input class="form-control" type="file" id="fileInput" required>
-                        <div class="form-text">Tamaño máximo: 10MB. Formatos permitidos: JPG, PNG, PDF, TXT</div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span class="spinner-border spinner-border-sm" id="uploadSpinner" role="status" aria-hidden="true"></span>
-                        Subir Archivo
-                    </button>
-                </form>
-                
-                <div class="progress mt-3" id="uploadProgress" style="display: none;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                </div>
+    <!-- Servers Sidebar -->
+    <div class="servers-sidebar">
+        <div class="server-icon active" title="Servidor principal">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+        <div class="server-icon" id="logout-btn" title="Cerrar sesión">
+            <i class="fas fa-sign-out-alt"></i>
+        </div>
+    </div>
+
+    <!-- Channels Sidebar -->
+    <div class="channels-sidebar">
+        <div class="server-header">
+            Chat Seguro
+        </div>
+        <div class="channel-list">
+            <div class="channel-item" onclick="window.location.href='chat.html'">
+                <i class="fas fa-hashtag"></i>
+                <span style="margin-left: 8px;">general</span>
+            </div>
+            <div class="channel-item active">
+                <i class="fas fa-file-alt"></i>
+                <span style="margin-left: 8px;">archivos</span>
             </div>
         </div>
+        <div class="user-profile">
+            <div class="user-avatar" id="user-avatar"></div>
+            <div class="user-info">
+                <div class="user-name" id="user-name"></div>
+                <div class="user-status" id="user-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Upload Container -->
+    <div class="file-container">
+        <div class="file-header">
+            <i class="fas fa-file-alt"></i>
+            <h3>Gestión de Archivos</h3>
+        </div>
         
-        <div class="file-info" id="fileInfo">
-            <h5>Información del Archivo</h5>
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <p><strong>Nombre:</strong> <span id="fileName"></span></p>
-                    <p><strong>Tamaño:</strong> <span id="fileSize"></span></p>
-                    <p><strong>Tipo:</strong> <span id="fileType"></span></p>
+        <div class="file-content">
+            <div class="file-upload-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing);">
+                    <h4>Subir Archivo</h4>
+                    <button id="connectWallet" style="background-color: #ff9800;">
+                        <i class="fas fa-wallet"></i> Conectar MetaMask
+                    </button>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Hash:</strong> <small id="fileHash" class="text-muted d-block text-truncate"></small></p>
-                    <p><strong>IPFS Hash:</strong> <small id="ipfsHash" class="text-muted d-block text-truncate"></small></p>
-                    <p><strong>Transacción:</strong> <small id="txHash" class="text-muted d-block text-truncate"></small></p>
+                <div id="walletStatus" style="margin-bottom: var(--spacing); font-size: 0.9em; display: none;">
+                    <span style="color: #4caf50;"><i class="fas fa-circle" style="font-size: 0.6em; vertical-align: middle;"></i> Conectado a MetaMask</span>
+                    <span style="margin-left: 8px; font-size: 0.8em; color: var(--text-secondary);" id="walletAddress"></span>
+                </div>
+                
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing);">Sube un archivo para limpiar sus metadatos y almacenarlo de forma segura.</p>
+                
+                <form id="uploadForm">
+                    <input type="file" id="fileInput" required>
+                    <div style="color: var(--text-secondary); font-size: 0.8em; margin-bottom: var(--spacing);">Tamaño máximo: 10MB. Formatos permitidos: JPG, PNG, PDF, TXT</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit">
+                            <span class="spinner" id="uploadSpinner"></span>
+                            Subir Archivo
+                        </button>
+                        <button type="button" id="registerOnBlockchain" disabled style="background-color: #3a3a3c;">
+                            <span class="spinner" id="blockchainSpinner" style="display: none;"></span>
+                            Registrar en Blockchain
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
                 </div>
             </div>
             
-            <h6>Metadatos</h6>
-            <div class="metadata-comparison">
-                <div class="metadata-panel">
-                    <h6>Original</h6>
-                    <pre id="originalMetadata" class="bg-light p-2 rounded"></pre>
+            <div class="file-info" id="fileInfo">
+                <h4>Información del Archivo</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: var(--spacing); margin-bottom: var(--spacing);">
+                    <div style="flex: 1; min-width: 250px;">
+                        <p><strong>Nombre:</strong> <span id="fileName"></span></p>
+                        <p><strong>Tamaño:</strong> <span id="fileSize"></span></p>
+                        <p><strong>Tipo:</strong> <span id="fileType"></span></p>
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <p><strong>Hash:</strong> <span id="fileHash" style="font-size: 0.8em; word-break: break-all;"></span></p>
+                        <p><strong>IPFS Hash:</strong> <span id="ipfsHash" style="font-size: 0.8em; word-break: break-all;"></span></p>
+                        <p><strong>Transacción:</strong> <span id="txHash" style="font-size: 0.8em; word-break: break-all;"></span></p>
+                    </div>
                 </div>
-                <div class="metadata-panel">
-                    <h6>Limpios</h6>
-                    <pre id="cleanedMetadata" class="bg-light p-2 rounded"></pre>
+                
+                <h5>Metadatos</h5>
+                <div class="metadata-comparison">
+                    <div class="metadata-panel">
+                        <h6>Original</h6>
+                        <pre id="originalMetadata" style="color: var(--text-primary);"></pre>
+                    </div>
+                    <div class="metadata-panel">
+                        <h6>Limpios</h6>
+                        <pre id="cleanedMetadata" style="color: var(--text-primary);"></pre>
+                    </div>
+                </div>
+                
+                <div style="text-align: right; margin-top: var(--spacing);">
+                    <a href="#" id="downloadLink" style="display: inline-block; padding: 8px 16px; background-color: #3ba55c; color: var(--text-primary); text-decoration: none; border-radius: var(--border-radius);">
+                        <i class="fas fa-download"></i> Descargar Archivo Limpio
+                    </a>
                 </div>
             </div>
-            
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
-                <a href="#" id="downloadLink" class="btn btn-success me-md-2">
-                    <i class="bi bi-download"></i> Descargar Archivo Limpio
-                </a>
+
+            <!-- Lista de archivos cargados -->
+            <div class="file-list" id="fileList">
+                <h4>Archivos Cargados</h4>
+                <div id="fileItems">
+                    <!-- Los elementos de archivo se cargarán aquí dinámicamente -->
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Variables globales para Web3 y MetaMask
+        let web3;
+        let accounts = [];
+        let currentFileData = null;
+        
+        // Verificar autenticación y cargar datos de usuario
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // Inicializar MetaMask si está disponible
+            initMetaMask();
+
+            // Cargar datos del usuario
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    document.getElementById('user-name').textContent = userData.username;
+                    document.getElementById('user-status').textContent = 'En línea';
+                    
+                    // Iniciales para el avatar
+                    const initials = userData.username.substring(0, 2).toUpperCase();
+                    const userAvatar = document.getElementById('user-avatar');
+                    userAvatar.textContent = initials;
+                    userAvatar.style.display = 'flex';
+                    userAvatar.style.alignItems = 'center';
+                    userAvatar.style.justifyContent = 'center';
+                }
+            } catch (error) {
+                console.error('Error al cargar datos del usuario:', error);
+            }
+
+            // Cargar lista de archivos
+            loadFileList();
+        });
+
+        // Manejar cierre de sesión
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/index.html';
+        });
+
+        // Cargar lista de archivos
+        async function loadFileList() {
+            try {
+                const response = await fetch('/api/files', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const files = await response.json();
+                    const fileItemsContainer = document.getElementById('fileItems');
+                    fileItemsContainer.innerHTML = '';
+                    
+                    if (files.length === 0) {
+                        fileItemsContainer.innerHTML = '<p style="color: var(--text-secondary);">No hay archivos cargados aún.</p>';
+                        return;
+                    }
+                    
+                    files.forEach(file => {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+                        
+                        // Determinar el icono según el tipo de archivo
+                        let iconClass = 'fas fa-file';
+                        if (file.mimeType.startsWith('image/')) {
+                            iconClass = 'fas fa-file-image';
+                        } else if (file.mimeType === 'application/pdf') {
+                            iconClass = 'fas fa-file-pdf';
+                        } else if (file.mimeType === 'text/plain') {
+                            iconClass = 'fas fa-file-alt';
+                        }
+                        
+                        fileItem.innerHTML = `
+                            <div class="file-icon">
+                                <i class="${iconClass}"></i>
+                            </div>
+                            <div class="file-details">
+                                <div><strong>${file.fileName}</strong></div>
+                                <div style="color: var(--text-secondary); font-size: 0.8em;">
+                                    ${formatFileSize(file.size)} • ${new Date(file.createdAt).toLocaleString()}
+                                </div>
+                            </div>
+                            <div class="file-actions">
+                                <a href="/api/files/download/${file.fileId}" title="Descargar">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                <a href="#" onclick="showFileDetails('${file.fileId}'); return false;" title="Ver detalles">
+                                    <i class="fas fa-info-circle"></i>
+                                </a>
+                            </div>
+                        `;
+                        
+                        fileItemsContainer.appendChild(fileItem);
+                    });
+                } else {
+                    throw new Error('Error al cargar la lista de archivos');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('fileItems').innerHTML = 
+                    `<p style="color: var(--error-color);">Error al cargar archivos: ${error.message}</p>`;
+            }
+        }
+
+        // Mostrar detalles de un archivo
+        async function showFileDetails(fileId) {
+            try {
+                // Restablecer el botón de registro en blockchain
+                const registerButton = document.getElementById('registerOnBlockchain');
+                registerButton.innerHTML = '<span class="spinner" id="blockchainSpinner" style="display: none;"></span> Registrar en Blockchain';
+                registerButton.disabled = true;
+                registerButton.style.backgroundColor = '#3a3a3c';
+                
+                const response = await fetch(`/api/files/${fileId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateFileInfo(data);
+                } else {
+                    throw new Error('Error al obtener detalles del archivo');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Manejar subida de archivos
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -137,6 +578,7 @@
             uploadSpinner.style.display = 'inline-block';
             uploadButton.disabled = true;
             progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
             
             try {
                 const formData = new FormData();
@@ -149,7 +591,6 @@
                     if (e.lengthComputable) {
                         const percentComplete = (e.loaded / e.total) * 100;
                         progressBar.style.width = percentComplete + '%';
-                        progressBar.setAttribute('aria-valuenow', percentComplete);
                     }
                 };
                 
@@ -157,6 +598,16 @@
                     if (xhr.status === 201) {
                         const response = JSON.parse(xhr.responseText);
                         updateFileInfo(response);
+                        
+                        // Restablecer el formulario y la barra de progreso
+                        document.getElementById('uploadForm').reset();
+                        progressBar.style.width = '0%';
+                        setTimeout(() => {
+                            progressContainer.style.display = 'none';
+                        }, 1000);
+                        
+                        // Recargar la lista de archivos
+                        loadFileList();
                     } else {
                         const error = JSON.parse(xhr.responseText);
                         throw new Error(error.error || 'Error al subir el archivo');
@@ -181,13 +632,24 @@
         });
         
         function updateFileInfo(data) {
+            // Guardar los datos del archivo actual para el registro en blockchain
+            currentFileData = data;
+            
             document.getElementById('fileInfo').style.display = 'block';
             document.getElementById('fileName').textContent = data.fileName;
             document.getElementById('fileSize').textContent = formatFileSize(data.size);
             document.getElementById('fileType').textContent = data.mimeType;
             document.getElementById('fileHash').textContent = data.hash;
             document.getElementById('ipfsHash').textContent = data.ipfsHash || 'No disponible';
-            document.getElementById('txHash').textContent = data.txHash || 'No disponible';
+            
+            // Mostrar hash de transacción si existe
+            if (data.txHash) {
+                const etherscanLink = `https://sepolia.etherscan.io/tx/${data.txHash}`;
+                document.getElementById('txHash').innerHTML = 
+                    `<a href="${etherscanLink}" target="_blank" style="color: var(--accent-color);">${data.txHash}</a>`;
+            } else {
+                document.getElementById('txHash').textContent = 'No disponible';
+            }
             
             // Mostrar metadatos
             document.getElementById('originalMetadata').textContent = 
@@ -203,6 +665,21 @@
             // Configurar enlace de descarga
             document.getElementById('downloadLink').href = `/api/files/download/${data.fileId}`;
             
+            // Habilitar botón de registro en blockchain si hay una wallet conectada
+            const registerButton = document.getElementById('registerOnBlockchain');
+            if (accounts.length > 0 && !data.txHash) {
+                registerButton.disabled = false;
+                registerButton.style.backgroundColor = '#ff9800';
+            } else if (data.txHash) {
+                registerButton.disabled = true;
+                registerButton.style.backgroundColor = '#4caf50';
+                registerButton.innerHTML = '<i class="fas fa-check"></i> Registrado';
+            } else {
+                registerButton.disabled = true;
+                registerButton.style.backgroundColor = '#3a3a3c';
+                registerButton.innerHTML = '<span class="spinner" id="blockchainSpinner" style="display: none;"></span> Registrar en Blockchain';
+            }
+            
             // Desplazarse a la sección de información
             document.getElementById('fileInfo').scrollIntoView({ behavior: 'smooth' });
         }
@@ -215,13 +692,156 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
-        // Verificar autenticación
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = '/login.html';
+        // Inicializar MetaMask
+        async function initMetaMask() {
+            // Verificar si MetaMask está instalado
+            if (typeof window.ethereum !== 'undefined') {
+                console.log('MetaMask está instalado!');
+                
+                // Configurar el botón de conexión
+                const connectButton = document.getElementById('connectWallet');
+                connectButton.addEventListener('click', connectMetaMask);
+                
+                // Configurar el botón de registro en blockchain
+                const registerButton = document.getElementById('registerOnBlockchain');
+                registerButton.addEventListener('click', registerFileOnBlockchain);
+                
+                // Si ya hay cuentas conectadas, actualizar la UI
+                if (ethereum.selectedAddress) {
+                    await connectMetaMask();
+                }
+            } else {
+                console.log('MetaMask no está instalado');
+                document.getElementById('connectWallet').textContent = 'Instalar MetaMask';
+                document.getElementById('connectWallet').addEventListener('click', () => {
+                    window.open('https://metamask.io/download.html', '_blank');
+                });
             }
-        });
+        }
+        
+        // Conectar con MetaMask
+        async function connectMetaMask() {
+            try {
+                // Inicializar Web3
+                web3 = new Web3(window.ethereum);
+                
+                // Solicitar conexión de cuenta
+                accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                const account = accounts[0];
+                
+                // Actualizar UI
+                document.getElementById('walletStatus').style.display = 'block';
+                document.getElementById('walletAddress').textContent = `${account.substring(0, 6)}...${account.substring(38)}`;
+                document.getElementById('connectWallet').textContent = 'Conectado';
+                document.getElementById('connectWallet').disabled = true;
+                
+                // Habilitar botón de registro si hay datos de archivo
+                if (currentFileData) {
+                    document.getElementById('registerOnBlockchain').disabled = false;
+                    document.getElementById('registerOnBlockchain').style.backgroundColor = '#ff9800';
+                }
+                
+                console.log('Conectado a MetaMask:', account);
+                
+                // Escuchar cambios de cuenta
+                ethereum.on('accountsChanged', handleAccountsChanged);
+                
+                return account;
+            } catch (error) {
+                console.error('Error al conectar con MetaMask:', error);
+                alert('Error al conectar con MetaMask: ' + error.message);
+            }
+        }
+        
+        // Manejar cambio de cuentas
+        function handleAccountsChanged(newAccounts) {
+            if (newAccounts.length === 0) {
+                // El usuario desconectó todas las cuentas
+                document.getElementById('walletStatus').style.display = 'none';
+                document.getElementById('connectWallet').textContent = 'Conectar MetaMask';
+                document.getElementById('connectWallet').disabled = false;
+                document.getElementById('registerOnBlockchain').disabled = true;
+                document.getElementById('registerOnBlockchain').style.backgroundColor = '#3a3a3c';
+                accounts = [];
+            } else if (newAccounts[0] !== accounts[0]) {
+                // El usuario cambió de cuenta
+                accounts = newAccounts;
+                const account = accounts[0];
+                document.getElementById('walletAddress').textContent = `${account.substring(0, 6)}...${account.substring(38)}`;
+            }
+        }
+        
+        // Registrar archivo en blockchain
+        async function registerFileOnBlockchain() {
+            if (!currentFileData || !currentFileData.hash) {
+                alert('No hay datos de archivo para registrar');
+                return;
+            }
+            
+            if (!web3 || accounts.length === 0) {
+                alert('Por favor conecta tu wallet de MetaMask primero');
+                return;
+            }
+            
+            const blockchainSpinner = document.getElementById('blockchainSpinner');
+            const registerButton = document.getElementById('registerOnBlockchain');
+            
+            try {
+                blockchainSpinner.style.display = 'inline-block';
+                registerButton.disabled = true;
+                
+                // Crear un mensaje para firmar con el hash del archivo
+                const fileHash = currentFileData.hash;
+                const message = `Registro de archivo: ${fileHash}`;
+                
+                // Firmar mensaje con MetaMask
+                const signature = await ethereum.request({
+                    method: 'personal_sign',
+                    params: [web3.utils.utf8ToHex(message), accounts[0]]
+                });
+                
+                // Enviar al servidor para registrar en blockchain
+                const response = await fetch(`/api/files/${currentFileData.fileId}/blockchain`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        address: accounts[0],
+                        signature: signature,
+                        message: message
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Actualizar UI con el hash de transacción
+                    document.getElementById('txHash').textContent = data.txHash || 'No disponible';
+                    if (data.txHash) {
+                        // Agregar enlace a Etherscan
+                        const etherscanLink = `https://sepolia.etherscan.io/tx/${data.txHash}`;
+                        document.getElementById('txHash').innerHTML = 
+                            `<a href="${etherscanLink}" target="_blank" style="color: var(--accent-color);">${data.txHash}</a>`;
+                    }
+                    
+                    alert('¡Archivo registrado exitosamente en blockchain!');
+                    
+                    // Recargar la lista de archivos
+                    loadFileList();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Error al registrar en blockchain');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error al registrar en blockchain: ${error.message}`);
+            } finally {
+                blockchainSpinner.style.display = 'none';
+                registerButton.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>

@@ -10,16 +10,16 @@ const fileSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  fileName: {
-    type: String,
-    required: true
-  },
   mimeType: {
     type: String,
     required: true
   },
   size: {
     type: Number,
+    required: true
+  },
+  path: {
+    type: String,
     required: true
   },
   hash: {
@@ -41,20 +41,26 @@ const fileSchema = new mongoose.Schema({
     }
   },
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    type: String,
+    required: true,
+    default: 'anonymous'
   },
   status: {
     type: String,
-    enum: ['uploaded', 'processing', 'completed', 'failed'],
-    default: 'uploaded'
+    enum: ['pending', 'processing', 'completed', 'failed', 'processed'],
+    default: 'pending'
+  },
+  cleaned: {
+    type: Boolean,
+    default: false
   },
   error: {
     type: String
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
 // Indexes for faster queries
@@ -64,7 +70,7 @@ fileSchema.index({ hash: 1 });
 fileSchema.index({ ipfsHash: 1 });
 fileSchema.index({ 'metadata.original.GPSLatitude': 1, 'metadata.original.GPSLongitude': 1 });
 
-// Static methods
+module.exports = mongoose.model('File', fileSchema);
 fileSchema.statics.findByFileId = function(fileId) {
   return this.findOne({ fileId });
 };

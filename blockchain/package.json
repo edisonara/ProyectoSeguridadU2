@@ -1,0 +1,16 @@
+{
+  "name": "blockchain-internal",
+  "version": "1.0.0",
+  "description": "Blockchain interna para el proyecto de seguridad",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "deploy": "node deploy.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "web3": "^4.6.0",
+    "solc": "^0.8.0"
+  },
+  "type": "module"
+}

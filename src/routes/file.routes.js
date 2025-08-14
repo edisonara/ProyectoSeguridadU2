@@ -80,9 +80,6 @@ router.post(
 // Ruta para descargar archivos
 router.get('/download/:fileId', verifyToken, fileController.downloadFile);
 
-// Ruta para obtener información de archivos
-router.get('/info/:fileId', verifyToken, fileController.getFileInfo);
-
 // Manejador de errores global para las rutas de archivos
 router.use((err, req, res, next) => {
   console.error('Error en la ruta de archivos:', err);
